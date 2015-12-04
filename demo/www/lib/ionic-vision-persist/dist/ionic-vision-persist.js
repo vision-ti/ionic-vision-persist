@@ -3,35 +3,53 @@
 
     angular.module('vision.persist', ['ngCordova', 'vision.event'])
 
-        .factory('$connectionFactory',['$cordovaSQLite', function ($cordovaSQLite) {
+        .factory('$connectionFactory',['$cordovaSQLite', '$window', function ($cordovaSQLite, $window) {
+
+            console.log("felionicipe Leonhardt");
+            console.log("felipe Leonhardt");
+            console.log("felipe Leonhardt");
+
+            var db;
+            var showSQL = false;
+
             return {
-                showSQL: false,
-                db: undefined,
-                init: function (DB_CONFIG) {
+                showSQL: showSQL,
+                db: db,
+                init: init,
+                execute: execute
+            };
 
-                    this.db = $cordovaSQLite.openDB(DB_CONFIG.name);
-                    this.showSQL = DB_CONFIG.showSQL;
+            function init(DB_CONFIG){
+                if ($window.cordova)
+                    db = $cordovaSQLite.openDB(DB_CONFIG.name);
+                else
+                    db = window.openDatabase(DB_CONFIG.name, '1.0', 'database', -1);
 
-                    angular.forEach(DB_CONFIG.entities, function (table) {
-                        var columns = [];
+                showSQL = DB_CONFIG.showSQL;
 
-                        angular.forEach(table.columns, function (column) {
-                            columns.push(column.name + ' ' + column.type);
-                        });
+                angular.forEach(DB_CONFIG.entities, function (table) {
+                    var columns = [];
 
-                        var query = 'CREATE TABLE IF NOT EXISTS ' + table.name + ' (' + columns.join(',') + ')';
-                        this.execute(query);
+                    angular.forEach(table.columns, function (column) {
+                        columns.push(column.name + ' ' + column.type);
                     });
-                },
-                execute: function (query, bindings) {
-                    return $cordovaSQLite.execute(this.db, query, bindings).then(function (result) {
+
+                    var query = 'CREATE TABLE IF NOT EXISTS ' + table.name + ' (' + columns.join(',') + ')';
+                    execute(query);
+                });
+            };
+
+            function execute (query, bindings) {
+                return $cordovaSQLite.execute(db, query, bindings).then(function (result) {
+
+                    if (showSQL)
                         console.info('SqlQuery: ' + query);
-                        return result;
-                    }, function (error) {
-                        console.error('Error on execute SqlQuery: ' + query);
-                        console.error(error);
-                    });
-                }
+
+                    return result;
+                }, function (error) {
+                    console.error('Error on execute SqlQuery: ' + query);
+                    console.error(error);
+                });
             };
         }])
 

@@ -1,6 +1,6 @@
 angular.module('starter', ['ionic', 'ngCordova', 'vision.persist', 'starter.controllers', 'starter.services'])
 
-    .run(function ($ionicPlatform, $connectionProvider) {
+    .run(function ($ionicPlatform, $connectionFactory, Chats) {
         $ionicPlatform.ready(function () {
 
             if (window.cordova && window.cordova.plugins && window.cordova.plugins.Keyboard) {
@@ -26,7 +26,9 @@ angular.module('starter', ['ionic', 'ngCordova', 'vision.persist', 'starter.cont
                     }
                 ]
             };
-            $connectionProvider.init(dbConfig);
+            $connectionFactory.init(dbConfig);
+            //Initiate
+           // Chats.populateSampleData();
         });
     })
 
