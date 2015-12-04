@@ -1,2 +1,2 @@
 # ionic-vision-persist
-Persistence layer for Ionic Framework
+SQLite persistence layer for Ionic Framework
