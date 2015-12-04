@@ -1,0 +1,32 @@
+{
+  "name": "ionic-vision-persist",
+  "version": "0.0.1-beta1",
+  "main": "dist/ionic-vision-persist.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vision-ti/ionic-vision-persist.git"
+  },
+  "authors": [
+    "Felipe Leonhardt, Eduardo Pereira"
+  ],
+  "description": "SQLite Persistence layer for Ionic Framework",
+  "keywords": [
+    "angular",
+    "ionic",
+    "vision",
+    "persistence",
+    "sqlite"
+  ],
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "angular": ">= 1.2.23",
+    "ngCordova": "~0.1.23-alpha"
+  }
+}
