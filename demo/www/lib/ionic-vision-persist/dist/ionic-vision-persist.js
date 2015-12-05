@@ -5,14 +5,17 @@
 
         .factory('$connectionFactory',['$cordovaSQLite', '$window', function ($cordovaSQLite, $window) {
 
-            var db;
+            var db = undefined;
             var showSQL = false;
-            var entities;
+            var entities = {};
 
             return {
-                db: db,
-                showSQL: showSQL,
-                entities: entities,
+                getDb: function(){
+                    return db;
+                },
+                getEntities: function(){
+                    return entities;
+                },
                 init: init,
                 execute: execute
             };
@@ -45,6 +48,9 @@
                     if (showSQL)
                         console.info('SqlQuery: ' + query);
                     return result;
+                }, function(response){
+                    //TODO Criar um tratamento especial para erros, pois podem ser de constraint e etc.., não é interessante realizar throw em todos
+                    throw response;
                 });
             };
         }])
@@ -52,164 +58,170 @@
         .factory('DataSet', ['VsUtil', '$connectionFactory', 'VisionEventDispatcher',
             function (VsUtil, $connectionFactory, VisionEventDispatcher) {
 
-            var DataSet = function (entityName) {
+                var DataSet = function (entityName) {
 
-                var self = this;
-                var canceled = false;
-                this.entityName = entityName;
-                this.entity = {};
-                this.appendAfterSave = false;
-
-                VisionEventDispatcher.call(this);
-
-                var getInsertConfig = function () {
-
-                    var parameters = [];
-                    var sqlQuery = 'insert into ' + this.entityName + ' (';
-                    var propertyValue = '';
-
-                    //TODO Substituir pelo entities configurado no connectionFactory, dessa forma o dataSet fica seguro, e teremos um dataSet por entidade, para garantir os bindings
-                    for (var key in this.entity) {
-                        if (key != '$$hashKey') {
-                            sqlQuery += ' ' + key + ', ';
-                            propertyValue += ' ?, ';
-                            parameters.push(this.entity[key]);
-                        }
-                    }
-                    sqlQuery = sqlQuery.substr(0, sqlQuery.length - 2);
-                    propertyValue = propertyValue.substr(0, propertyValue.length - 2);
-                    sqlQuery += ') values (' + propertyValue + ')';
-                    return {
-                        sql: sqlQuery,
-                        parameters: parameters
-                    }
-                };
-
-                var getUpdateConfig = function () {
-                    var parameters = [];
-                    var sqlQuery = 'update ' + this.entityName + ' set ';
-
-                    //TODO Substituir pelo entities configurado no connectionFactory, dessa forma o dataSet fica seguro, e teremos um dataSet por entidade, para garantir os bindings
-                    for (var key in this.entity) {
-                        if (key != 'id' && key != '$$hashKey') {
-                            sqlQuery += ' ' + key + ' = ?, ';
-                            parameters.push(this.entity[key]);
-                        }
-                    }
-
-                    sqlQuery = sqlQuery.substr(0, sqlQuery.length - 2);
-                    sqlQuery += ' where id = ? ';
-                    parameters.push(this.entity['id']);
-                    return {
-                        sql: sqlQuery,
-                        parameters: parameters
-                    }
-                };
-
-                /**
-                 * Clear entity and instantiate new Object
-                 */
-                this.append = function(){
-                    canceled = false;
+                    var self = this;
+                    var canceled = false;
+                    this.entityName = entityName;
                     this.entity = {};
-                    this.dispatch(new DataSetEvent((DataSetEvent.AFTER_APPEND)));
-                };
+                    this.appendAfterSave = false;
+                    this.resultList = [];
 
-                this.cancel = function () {
-                    canceled = true;
-                };
+                    VisionEventDispatcher.call(this);
 
-                /**
-                 * Save entity
-                 * @returns {*}
-                 */
-                this.save = function () {
+                    /**
+                     * Clear entity and instantiate new Object
+                     */
+                    this.append = function(){
+                        canceled = false;
+                        this.entity = {};
+                        this.dispatch(new DataSetEvent((DataSetEvent.AFTER_APPEND)));
+                    };
 
-                    canceled = false;
+                    this.cancel = function () {
+                        canceled = true;
+                    };
 
-                    this.dispatch(new DataSetEvent(DataSetEvent.BEFORE_SAVE));
+                    /**
+                     * Save entity
+                     * @returns {*}
+                     */
+                    this.save = function () {
 
-                    if (!canceled) {
+                        canceled = false;
 
-                        var executeConfig;
-                        if (VsUtil.isFilled(self.entity.id))
-                            executeConfig = getUpdateConfig();
-                        else
-                            executeConfig = getInsertConfig();
+                        this.dispatch(new DataSetEvent(DataSetEvent.BEFORE_SAVE));
 
-                        return $connectionFactory.execute(executeConfig.sql, executeConfig.parameters).then(function (result) {
+                        if (!canceled) {
 
-                            if (self.appendAfterSave)
-                                self.append();
+                            var executeConfig;
+                            if (VsUtil.isFilled(self.entity.id))
+                                executeConfig = getUpdateConfig();
+                            else
+                                executeConfig = getInsertConfig();
 
-                            self.dispatch(new DataSetEvent(DataSetEvent.AFTER_SAVE), result);
+                            return $connectionFactory.execute(executeConfig.sql, executeConfig.parameters).then(function (result) {
+
+                                if (self.appendAfterSave)
+                                    self.append();
+
+                                self.dispatch(new DataSetEvent(DataSetEvent.AFTER_SAVE), result);
+                            });
+
+                        } else {
+                            var deferred = $q.defer();
+                            //timeout to process reject if canceled;
+                            $timeout(function () {
+                                deferred.reject();
+                            });
+
+                            return deferred.promise;
+                        }
+                    };
+
+                    /**
+                     * Remove entity
+                     * @returns {*}
+                     */
+                    this.remove = function () {
+
+                        this.dispatch(new DataSetEvent(DataSetEvent.BEFORE_REMOVE));
+
+                        if (!VsUtil.isFilled(this.entity.id)) {
+                            throw 'ID is required for remove operation.';
+                        }
+
+                        var parameters = [this.entity.id];
+                        return $connectionFactory.execute('delete from ' + this.entityName + ' where id = (?)', parameters).then(function (result) {
+                            self.dispatch(new DataSetEvent(DataSetEvent.AFTER_REMOVE, result));
+                            return result;
                         });
+                    };
 
-                    } else {
-                        var deferred = $q.defer();
-                        //timeout to process reject if canceled;
-                        $timeout(function () {
-                            deferred.reject();
-                        });
+                    /**
+                     * Find by id
+                     * @param id
+                     * @returns {*}
+                     */
+                    this.get = function(id){
+                        this.entity = {};
+                        return $connectionFactory.execute('select * from ' + this.entityName + ' where id = (?)', [id])
+                            .then(function(result){
+                                self.entity = result.rows.item(0);
+                                self.dispatch(new DataSetEvent(DataSetEvent.GET_RESULT, self.entity));
+                                return self.entity;
+                            });
+                    };
 
-                        return deferred.promise;
-                    }
-                };
+                    /**
+                     * Find all
+                     * @returns {*}
+                     */
+                    this.all = function(){
+                        return $connectionFactory.execute('select * from ' + this.entityName)
+                            .then(function(result){
+                                self.resultList = [];
 
-                /**
-                 * Remove entity
-                 * @returns {*}
-                 */
-                this.remove = function () {
+                                for (var i = 0; i < result.rows.length; i++) {
+                                    self.resultList.push(result.rows.item(i));
+                                }
+                                self.dispatch(new DataSetEvent(DataSetEvent.GET_ALL_RESULT, self.resultList));
+                                return self.resultList;
+                            })
+                    };
 
-                    this.dispatch(new DataSetEvent(DataSetEvent.BEFORE_REMOVE));
+                    function getInsertConfig() {
 
-                    if (!VsUtil.isFilled(this.entity.id)) {
-                        throw error "ID is required for remove operation.";
-                    }
+                        var parameters = [];
+                        var sqlQuery = 'insert into ' + self.entityName + ' (';
+                        var propertyValue = '';
+                        var entityMetadata = $connectionFactory.getEntities()[self.entityName];
+                        for (var key in entityMetadata) {
+                            if (key != '$$hashKey') {
+                                sqlQuery += ' ' + key + ', ';
+                                propertyValue += ' ?, ';
 
-                    var parameters = [this.entity.id];
-                    return $connectionFactory.execute('delete from ' + this.entityName + ' where id = (?)', parameters).then(function (result) {
-                        self.dispatch(new DataSetEvent(DataSetEvent.AFTER_REMOVE, result));
-                        return result;
-                    });
-                };
+                                //autoincrement do not execute if value is undefined
+                                if (key == 'id' && self.entity[key] == undefined)
+                                    self.entity[key] = null;
 
-                /**
-                 * Find by id
-                 * @param id
-                 * @returns {*}
-                 */
-                this.get = function(id){
-                    return $connectionFactory.execute('select * from ' + this.entityName + ' where id = (?)', parameters)
-                        .then(function(result){
-                            this.entity = result.rows.item(0);
-                            self.dispatch(new DataSetEvent(DataSetEvent.GET_RESULT, this.entity));
-                            return this.entity;
-                    });
-                };
-
-                /**
-                 * Find all
-                 * @returns {*}
-                 */
-                this.all = function(){
-                    return $connectionFactory.execute('select * from ' + this.entityName)
-                        .then(function(result){
-                            var entities = [];
-
-                            for (var i = 0; i < result.rows.length; i++) {
-                                entities.push(result.rows.item(i));
+                                parameters.push(self.entity[key]);
                             }
-                            self.dispatch(new DataSetEvent(DataSetEvent.GET_ALL_RESULT, entities));
-                            return entities;
-                        })
-                };
-            };
-            DataSet.prototype = new VisionEventDispatcher();
+                        }
+                        sqlQuery = sqlQuery.substr(0, sqlQuery.length - 2);
+                        propertyValue = propertyValue.substr(0, propertyValue.length - 2);
+                        sqlQuery += ') values (' + propertyValue + ')';
+                        return {
+                            sql: sqlQuery,
+                            parameters: parameters
+                        }
+                    };
 
-            return DataSet;
-        }]);
+                    function getUpdateConfig (){
+                        var parameters = [];
+                        var sqlQuery = 'update ' + self.entityName + ' set ';
+                        var entityMetadata = $connectionFactory.getEntities()[self.entityName];
+                        for (var key in entityMetadata) {
+                            if (key != 'id' && key != '$$hashKey') {
+                                sqlQuery += ' ' + key + ' = ?, ';
+                                parameters.push(self.entity[key]);
+                            }
+                        }
+
+                        sqlQuery = sqlQuery.substr(0, sqlQuery.length - 2);
+                        sqlQuery += ' where id = ? ';
+                        parameters.push(entityMetadata['id']);
+                        return {
+                            sql: sqlQuery,
+                            parameters: parameters
+                        }
+                    };
+
+                };
+                DataSet.prototype = new VisionEventDispatcher();
+
+                return DataSet;
+            }]);
 })();
 
 /**

@@ -19,13 +19,18 @@ angular.module('starter.services', [])
 
         return {
             ds: ds,
-            populateSampleData: populateSampleData,
-            remove: remove
+            get: get,
+            remove: remove,
+            populateSampleData: populateSampleData
         };
+
+        function get(id){
+          return ds.get(id);
+        }
 
         function remove(chat){
             ds.entity = chat;
-            ds.remove();
+            return ds.remove();
         }
 
         function populateSampleData() {

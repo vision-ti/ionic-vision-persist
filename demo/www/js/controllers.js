@@ -5,17 +5,21 @@ angular.module('starter.controllers', [])
 
     .controller('ChatsCtrl', function ($scope, Chats) {
 
-        Chats.ds.all().then(function(chats){
-            $scope.chats = chats;
-        });
+        //to binding when all(), see tab-chats.html ng-reapeat
+        $scope.chatDs = Chats.ds;
+        Chats.ds.all();
 
         $scope.remove = function (chat) {
-            Chats.remove(chat);
+            Chats.remove(chat).then(function(){
+                Chats.ds.all();
+            });
         };
     })
 
     .controller('ChatDetailCtrl', function ($scope, $stateParams, Chats) {
-        $scope.chat = Chats.get($stateParams.chatId);
+        //to binding when get, see chat-detail.html
+        $scope.chatDs = Chats.ds;
+        Chats.ds.get($stateParams.chatId);
     })
 
     .controller('AccountCtrl', function ($scope) {

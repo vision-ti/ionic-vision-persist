@@ -4,11 +4,17 @@
   The FriendsCtrl pulls data from the Friends service (service.js)
   The Friends service returns an array of friend data
 -->
-<ion-view view-title="{{chat.name}}">
+<ion-view view-title="{{chatDs.entity.name}}">
+
+  //workaround for this issue: https://github.com/driftyco/ionic/issues/2847
+  <ion-nav-title>
+    {{chatDs.entity.name}}
+  </ion-nav-title>
+
   <ion-content class="padding">
-    <img ng-src="{{chat.face}}" style="width: 64px; height: 64px">
+    <img ng-src="{{chatDs.entity.face}}" style="width: 64px; height: 64px">
     <p>
-      {{chat.lastText}}
+      {{chatDs.entity.lastText}}
     </p>
   </ion-content>
 </ion-view>
