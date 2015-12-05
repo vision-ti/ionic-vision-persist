@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "ngCordova": "~0.1.23-alpha",
-    "angular-vision": "~1.0.0"
+    "angular-vision": "~1.0.0",
+    "ionic-vision-persist": "~0.0.1-alpha1"
   }
 }

@@ -85,11 +85,11 @@ angular.module('vision.utils', [])
         VsUtil.isFilled = function(value){
             if (value != null ) value = value.toString();
             return (value != null
-            && value != ""
-            && value != " "
-            && value != "null"
-            && value != "NaN"
-            && value != "undefined");
+                && value != ""
+                && value != " "
+                && value != "null"
+                && value != "NaN"
+                && value != "undefined");
         };
 
         return VsUtil;
@@ -243,9 +243,9 @@ angular.module('vision.utils', [])
 
 angular.module('vision.event', ['vision.utils'])
 
-/**
- * Event driven
- */
+    /**
+     * Event driven
+     */
     .factory('VisionEventDispatcher', ['VsArrayUtils', '$filter', '$q', function(VsArrayUtils, $filter, $q){
 
         var VisionEventDispatcher = function(){
