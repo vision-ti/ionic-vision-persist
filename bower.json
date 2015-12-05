@@ -27,6 +27,7 @@
   ],
   "dependencies": {
     "angular": ">= 1.2.23",
-    "ngCordova": "~0.1.23-alpha"
+    "ngCordova": "~0.1.23-alpha",
+    "angular-vision": "~1.0.0"
   }
 }
