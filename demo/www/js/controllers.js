@@ -5,8 +5,10 @@ angular.module('starter.controllers', [])
 
     .controller('ChatsCtrl', function ($scope, Chats) {
 
-        Chats.populateSampleData();
-        $scope.chats = Chats.all();
+        Chats.ds.all().then(function(chats){
+            $scope.chats = chats;
+        });
+
         $scope.remove = function (chat) {
             Chats.remove(chat);
         };

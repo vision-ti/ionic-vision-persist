@@ -5,50 +5,46 @@
 
         .factory('$connectionFactory',['$cordovaSQLite', '$window', function ($cordovaSQLite, $window) {
 
-            console.log("felionicipe Leonhardt");
-            console.log("felipe Leonhardt");
-            console.log("felipe Leonhardt");
-
             var db;
             var showSQL = false;
+            var entities;
 
             return {
-                showSQL: showSQL,
                 db: db,
+                showSQL: showSQL,
+                entities: entities,
                 init: init,
                 execute: execute
             };
 
-            function init(DB_CONFIG){
+            function init(dbConfig){
+
                 if ($window.cordova)
-                    db = $cordovaSQLite.openDB(DB_CONFIG.name);
+                    db = $cordovaSQLite.openDB(dbConfig.name);
                 else
-                    db = window.openDatabase(DB_CONFIG.name, '1.0', 'database', -1);
+                    db = window.openDatabase(dbConfig.name, '1.0', 'database', -1);
 
-                showSQL = DB_CONFIG.showSQL;
+                showSQL = dbConfig.showSQL;
+                entities = dbConfig.entities;
 
-                angular.forEach(DB_CONFIG.entities, function (table) {
-                    var columns = [];
-
-                    angular.forEach(table.columns, function (column) {
-                        columns.push(column.name + ' ' + column.type);
-                    });
-
-                    var query = 'CREATE TABLE IF NOT EXISTS ' + table.name + ' (' + columns.join(',') + ')';
+                var columns;
+                var entity;
+                for (var entityName in entities){
+                    entity = entities[entityName];
+                    columns = [];
+                    for (var property in entity){
+                        columns.push(property + ' ' +  entity[property].type);
+                    }
+                    var query = 'CREATE TABLE IF NOT EXISTS ' + entityName + ' (' + columns.join(',') + ')';
                     execute(query);
-                });
+                }
             };
 
             function execute (query, bindings) {
                 return $cordovaSQLite.execute(db, query, bindings).then(function (result) {
-
                     if (showSQL)
                         console.info('SqlQuery: ' + query);
-
                     return result;
-                }, function (error) {
-                    console.error('Error on execute SqlQuery: ' + query);
-                    console.error(error);
                 });
             };
         }])
@@ -56,11 +52,11 @@
         .factory('DataSet', ['VsUtil', '$connectionFactory', 'VisionEventDispatcher',
             function (VsUtil, $connectionFactory, VisionEventDispatcher) {
 
-                var DataSet = function () {
+                var DataSet = function (entityName) {
 
                     var self = this;
                     var canceled = false;
-                    this.entityName = '';
+                    this.entityName = entityName;
                     this.entity = {};
                     this.appendAfterSave = false;
 
@@ -69,14 +65,15 @@
                     var getInsertConfig = function () {
 
                         var parameters = [];
-                        var sqlQuery = 'insert into ' + self.entityName + ' (';
+                        var sqlQuery = 'insert into ' + this.entityName + ' (';
                         var propertyValue = '';
 
-                        for (var key in self.entity) {
+                        //TODO Substituir pelo entities configurado no connectionFactory, dessa forma o dataSet fica seguro, e teremos um dataSet por entidade, para garantir os bindings
+                        for (var key in this.entity) {
                             if (key != '$$hashKey') {
                                 sqlQuery += ' ' + key + ', ';
                                 propertyValue += ' ?, ';
-                                parameters.push(self.entity[key]);
+                                parameters.push(this.entity[key]);
                             }
                         }
                         sqlQuery = sqlQuery.substr(0, sqlQuery.length - 2);
@@ -90,24 +87,28 @@
 
                     var getUpdateConfig = function () {
                         var parameters = [];
-                        var sqlQuery = 'update ' + self.entityName + ' set ';
+                        var sqlQuery = 'update ' + this.entityName + ' set ';
 
-                        for (var key in self.entity) {
+                        //TODO Substituir pelo entities configurado no connectionFactory, dessa forma o dataSet fica seguro, e teremos um dataSet por entidade, para garantir os bindings
+                        for (var key in this.entity) {
                             if (key != 'id' && key != '$$hashKey') {
                                 sqlQuery += ' ' + key + ' = ?, ';
-                                parameters.push(self.entity[key]);
+                                parameters.push(this.entity[key]);
                             }
                         }
 
                         sqlQuery = sqlQuery.substr(0, sqlQuery.length - 2);
                         sqlQuery += ' where id = ? ';
-                        parameters.push(self.entity['id']);
+                        parameters.push(this.entity['id']);
                         return {
                             sql: sqlQuery,
                             parameters: parameters
                         }
                     };
 
+                    /**
+                     * Clear entity and instantiate new Object
+                     */
                     this.append = function(){
                         canceled = false;
                         this.entity = {};
@@ -118,6 +119,10 @@
                         canceled = true;
                     };
 
+                    /**
+                     * Save entity
+                     * @returns {*}
+                     */
                     this.save = function () {
 
                         canceled = false;
@@ -151,20 +156,55 @@
                         }
                     };
 
+                    /**
+                     * Remove entity
+                     * @returns {*}
+                     */
                     this.remove = function () {
 
                         this.dispatch(new DataSetEvent(DataSetEvent.BEFORE_REMOVE));
 
-                        if (!VsUtil.isFilled(self.entity.id)) {
-                            throw error
-                            "ID is required for remove operation.";
+                        if (!VsUtil.isFilled(this.entity.id)) {
+                            throw error "ID is required for remove operation.";
                         }
-                        var parameters = [self.entity.id];
-                        return $connectionFactory.execute('delete from ' + self.entityName + ' where id = (?)', parameters).then(function (result) {
+
+                        var parameters = [this.entity.id];
+                        return $connectionFactory.execute('delete from ' + this.entityName + ' where id = (?)', parameters).then(function (result) {
                             self.dispatch(new DataSetEvent(DataSetEvent.AFTER_REMOVE, result));
                             return result;
                         });
-                    }
+                    };
+
+                    /**
+                     * Find by id
+                     * @param id
+                     * @returns {*}
+                     */
+                    this.get = function(id){
+                        return $connectionFactory.execute('select * from ' + this.entityName + ' where id = (?)', parameters)
+                            .then(function(result){
+                                this.entity = result.rows.item(0);
+                                self.dispatch(new DataSetEvent(DataSetEvent.GET_RESULT, this.entity));
+                                return this.entity;
+                            });
+                    };
+
+                    /**
+                     * Find all
+                     * @returns {*}
+                     */
+                    this.all = function(){
+                        return $connectionFactory.execute('select * from ' + this.entityName)
+                            .then(function(result){
+                                var entities = [];
+
+                                for (var i = 0; i < result.rows.length; i++) {
+                                    entities.push(result.rows.item(i));
+                                }
+                                self.dispatch(new DataSetEvent(DataSetEvent.GET_ALL_RESULT, entities));
+                                return entities;
+                            })
+                    };
                 };
                 DataSet.prototype = new VisionEventDispatcher();
 
@@ -188,3 +228,5 @@ DataSetEvent.BEFORE_SAVE = 'ds:beforeSave';
 DataSetEvent.AFTER_SAVE = 'ds:afterSave';
 DataSetEvent.BEFORE_REMOVE = 'ds:beforeRemove';
 DataSetEvent.AFTER_REMOVE = 'ds:afterRemove';
+DataSetEvent.GET_RESULT = 'ds:getResult';
+DataSetEvent.GET_ALL_RESULT = 'ds:getAllResult';

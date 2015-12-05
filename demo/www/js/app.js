@@ -14,21 +14,20 @@ angular.module('starter', ['ionic', 'ngCordova', 'vision.persist', 'starter.cont
 
             var dbConfig = {
                 name: 'visionPersistDemo.db',
-                entities: [
-                    {
-                        name: 'chat',
-                        columns: [
-                            {name: 'id', type: 'integer primary key'},
-                            {name: 'name', type: 'text'},
-                            {name: 'lastText', type: 'text'},
-                            {name: 'face', type: 'text'}
-                        ]
+                showSQL: true,
+                entities: {
+                    chat: {
+                        id:         {type: 'integer primary key'},
+                        name:       {type: 'text'},
+                        lastText:   {type: 'text'},
+                        face:       {type: 'text'}
                     }
-                ]
+                }
             };
             $connectionFactory.init(dbConfig);
+
             //Initiate
-           // Chats.populateSampleData();
+            Chats.populateSampleData();
         });
     })
 

@@ -3,7 +3,7 @@ angular.module('starter.services', [])
     .factory('Chats', ['DataSet', function (DataSet) {
 
         //Populating sample data
-        var ds = new DataSet();
+        var ds = new DataSet('chat');
 
         ds.listen(DataSetEvent.AFTER_APPEND, function () {
             console.log('afterAppend released');
@@ -19,11 +19,16 @@ angular.module('starter.services', [])
 
         return {
             ds: ds,
-            populateSampleData: populateSampleData
+            populateSampleData: populateSampleData,
+            remove: remove
         };
 
+        function remove(chat){
+            ds.entity = chat;
+            ds.remove();
+        }
+
         function populateSampleData() {
-            ds.entityName = 'chats';
 
             ds.appendAfterSave = true;
 
@@ -34,7 +39,7 @@ angular.module('starter.services', [])
             };
             ds.save();
 
-           /* ds.entity = {
+            ds.entity = {
                 name: 'Max Lynx',
                 lastText: 'Hey, it\'s me',
                 face: 'img/max.png'
@@ -60,6 +65,6 @@ angular.module('starter.services', [])
                 lastText: 'This is wicked good ice cream.',
                 face: 'img/mike.png'
             };
-            ds.save();*/
+            ds.save();
         };
     }]);
