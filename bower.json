@@ -1,6 +1,6 @@
 {
   "name": "ionic-vision-persist",
-  "version": "0.0.1-beta1",
+  "version": "0.0.1-alpha1",
   "main": "dist/ionic-vision-persist.js",
   "repository": {
     "type": "git",

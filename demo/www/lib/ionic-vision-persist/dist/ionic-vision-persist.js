@@ -1,6 +1,12 @@
 (function () {
     'use strict';
 
+    /*
+     * ionic-vision-persist
+     * v0.0.1-alpha1
+     * (c) 2015 Vision Tecnologia e Informação http://vision-ti.com.br
+     * License: MIT
+     */
     angular.module('vision.persist', ['ngCordova', 'vision.event'])
 
         .factory('$connectionFactory',['$cordovaSQLite', '$window', function ($cordovaSQLite, $window) {
