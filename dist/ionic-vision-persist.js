@@ -9,24 +9,24 @@
      */
     angular.module('vision.persist', ['ngCordova', 'vision.event'])
 
-        .factory('$connectionFactory',['$cordovaSQLite', '$window', function ($cordovaSQLite, $window) {
+        .factory('$connectionFactory', ['$cordovaSQLite', '$window', function ($cordovaSQLite, $window) {
 
             var db = undefined;
             var showSQL = false;
             var entities = {};
 
             return {
-                getDb: function(){
+                getDb: function () {
                     return db;
                 },
-                getEntities: function(){
+                getEntities: function () {
                     return entities;
                 },
                 init: init,
                 execute: execute
             };
 
-            function init(dbConfig){
+            function init(dbConfig) {
 
                 if ($window.cordova)
                     db = $cordovaSQLite.openDB(dbConfig.name);
@@ -38,23 +38,23 @@
 
                 var columns;
                 var entity;
-                for (var entityName in entities){
+                for (var entityName in entities) {
                     entity = entities[entityName];
                     columns = [];
-                    for (var property in entity){
-                        columns.push(property + ' ' +  entity[property].type);
+                    for (var property in entity) {
+                        columns.push(property + ' ' + entity[property].type);
                     }
                     var query = 'CREATE TABLE IF NOT EXISTS ' + entityName + ' (' + columns.join(',') + ')';
                     execute(query);
                 }
             };
 
-            function execute (query, bindings) {
+            function execute(query, bindings) {
                 return $cordovaSQLite.execute(db, query, bindings).then(function (result) {
                     if (showSQL)
                         console.info('SqlQuery: ' + query);
                     return result;
-                }, function(response){
+                }, function (response) {
                     //TODO Criar um tratamento especial para erros, pois podem ser de constraint e etc.., não é interessante realizar throw em todos
                     throw response;
                 });
@@ -78,7 +78,7 @@
                     /**
                      * Clear entity and instantiate new Object
                      */
-                    this.append = function(){
+                    this.append = function () {
                         canceled = false;
                         this.entity = {};
                         this.dispatch(new DataSetEvent((DataSetEvent.AFTER_APPEND)));
@@ -149,11 +149,57 @@
                      * @param id
                      * @returns {*}
                      */
-                    this.get = function(id){
+                    this.get = function (id) {
                         this.entity = {};
                         return $connectionFactory.execute('select * from ' + this.entityName + ' where id = (?)', [id])
-                            .then(function(result){
+                            .then(function (result) {
                                 self.entity = result.rows.item(0);
+                                self.dispatch(new DataSetEvent(DataSetEvent.GET_RESULT, self.entity));
+                                return self.entity;
+                            });
+                    };
+
+                    /**
+                     * Find by entity
+                     * @param
+                     * @returns {*}
+                     */
+                    this.getByEntity = function () {
+                        var parameters = [];
+                        var sqlQuery = 'select ';
+                        var selectQuery = '';
+                        var whereQuery = '';
+                        var entityMetadata = $connectionFactory.getEntities()[self.entityName];
+
+                        for (var key in entityMetadata) {
+                            if (key != '$$hashKey') {
+                                selectQuery += ' ' + self.entityName + '.' + key + ' as ' + self.entityName + '_' + key + ', ';
+
+                                if (VsUtil.isFilled(self.entity[key])) {
+                                    whereQuery += ' and ' + self.entityName + '.' + key + ' = ? ';
+                                    parameters.push(self.entity[key]);
+                                }
+                            }
+                        }
+
+                        sqlQuery += selectQuery.substr(0, selectQuery.length - 2);
+
+                        sqlQuery += ' from ' + self.entityName + ' ';
+
+                        sqlQuery += ' where 1=1 ' + whereQuery;
+
+                        sqlQuery += ' limit 1 ';
+
+                        return $connectionFactory.execute(sqlQuery, parameters)
+                            .then(function (result) {
+                                var entity = {};
+
+                                for (var key in result.rows.item(0)) {
+                                    var strKey = key.split('_');
+                                    entity[strKey[1]] = result.rows.item(0)[key];
+                                }
+
+                                self.entity = entity;
                                 self.dispatch(new DataSetEvent(DataSetEvent.GET_RESULT, self.entity));
                                 return self.entity;
                             });
@@ -163,13 +209,60 @@
                      * Find all
                      * @returns {*}
                      */
-                    this.all = function(){
+                    this.all = function () {
                         return $connectionFactory.execute('select * from ' + this.entityName)
-                            .then(function(result){
+                            .then(function (result) {
                                 self.resultList = [];
 
                                 for (var i = 0; i < result.rows.length; i++) {
                                     self.resultList.push(result.rows.item(i));
+                                }
+                                self.dispatch(new DataSetEvent(DataSetEvent.GET_ALL_RESULT, self.resultList));
+                                return self.resultList;
+                            })
+                    };
+
+                    /**
+                     * Find all by entity
+                     * @returns {*}
+                     */
+                    this.getAllByEntity = function () {
+                        var parameters = [];
+                        var sqlQuery = 'select ';
+                        var selectQuery = '';
+                        var whereQuery = '';
+                        var entityMetadata = $connectionFactory.getEntities()[self.entityName];
+
+                        for (var key in entityMetadata) {
+                            if (key != '$$hashKey') {
+                                selectQuery += ' ' + self.entityName + '.' + key + ' as ' + self.entityName + '_' + key + ', ';
+
+                                if (VsUtil.isFilled(self.entity[key])) {
+                                    whereQuery += ' and ' + self.entityName + '.' + key + ' = ? ';
+                                    parameters.push(self.entity[key]);
+                                }
+                            }
+                        }
+
+                        sqlQuery += selectQuery.substr(0, selectQuery.length - 2);
+
+                        sqlQuery += ' from ' + self.entityName + ' ';
+
+                        sqlQuery += ' where 1=1 ' + whereQuery;
+
+                        return $connectionFactory.execute(sqlQuery, parameters)
+                            .then(function (result) {
+                                self.resultList = [];
+
+                                for (var i = 0; i < result.rows.length; i++) {
+                                    var entity = {};
+
+                                    for (var key in result.rows.item(i)) {
+                                        var strKey = key.split('_');
+                                        entity[strKey[1]] = result.rows.item(i)[key];
+                                    }
+
+                                    self.resultList.push(entity);
                                 }
                                 self.dispatch(new DataSetEvent(DataSetEvent.GET_ALL_RESULT, self.resultList));
                                 return self.resultList;
@@ -203,10 +296,11 @@
                         }
                     };
 
-                    function getUpdateConfig (){
+                    function getUpdateConfig() {
                         var parameters = [];
                         var sqlQuery = 'update ' + self.entityName + ' set ';
                         var entityMetadata = $connectionFactory.getEntities()[self.entityName];
+
                         for (var key in entityMetadata) {
                             if (key != 'id' && key != '$$hashKey') {
                                 sqlQuery += ' ' + key + ' = ?, ';
@@ -216,7 +310,7 @@
 
                         sqlQuery = sqlQuery.substr(0, sqlQuery.length - 2);
                         sqlQuery += ' where id = ? ';
-                        parameters.push(entityMetadata['id']);
+                        parameters.push(self.entity.id);
                         return {
                             sql: sqlQuery,
                             parameters: parameters
